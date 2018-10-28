@@ -46,6 +46,7 @@ typedef union {
 		uint8_t error_string[512];
 	} error;
  } tftp_message;
+
 char *base_directory;
 
  ssize_t tftp_send_data(int s, uint16_t block_number, uint8_t *data,
@@ -59,6 +60,31 @@ char *base_directory;
 	c = sendto(s, &m, 4 + dlen, 0,	(struct sockaddr *) sock, slen);
  	return c;
 }
+
+ ssize_t tftp_send_error(int s, uint16_t error_code, struct sockaddr_in *sock, socklen_t slen)
+{
+	tftp_message m;
+	ssize_t c;
+	int dlen;
+ 	m.opcode = htons(ERROR);
+	char errormsg1[] = "File not found";
+	m.error.error_code = 1;
+	/*
+	switch(error_code){
+		case 1: printf("%s\n", errormsg1);
+				dlen = strlen(errormsg1);
+				memcpy(m.error.error_string, errormsg1, dlen);
+		default:
+			return 0;
+	}
+	*/
+	printf("%s\n", errormsg1);
+	dlen = strlen(errormsg1);
+	memcpy(m.error.error_string, errormsg1, dlen);
+	c = sendto(s, &m, 4 + dlen, 0,	(struct sockaddr *) sock, slen);
+ 	return c;
+}
+
  ssize_t tftp_send_ack(int s, uint16_t block_number,
 	struct sockaddr_in *sock, socklen_t slen)
 {
@@ -127,7 +153,7 @@ char *base_directory;
 				opcode = ntohs(message.opcode);
 				fd = fopen(filename, opcode == RRQ ? "r" : "w");
 				if(fd == NULL){
-					printf("The requested file is not exit.\n");
+				    tftp_send_error(s, 1, &client_sock, slen);
 					exit(1);
 				}
 				mode = strcasecmp(mode_s, "netascii") ? NETASCII :strcasecmp(mode_s, "octet") ? OCTET :0;
@@ -151,6 +177,9 @@ char *base_directory;
 							for (countdown = RECV_RETRIES; countdown; countdown--) {
 								c = tftp_send_data(s, block_number, data, dlen, &client_sock, slen);
 								c = tftp_recv_message(s, &m, &client_sock, &slen);
+								if(countdown != 10){
+									printf("The remaining retries nunber is %d.\n", countdown);
+								}
 								if (c >= 4) {
 									break;
 								}
@@ -196,11 +225,22 @@ char *base_directory;
 							for(countdown = RECV_RETRIES; countdown; countdown--){
 								c = tftp_send_data(s, block_number, data, count_r, &client_sock, slen);
 								c = tftp_recv_message(s, &m, &client_sock, &slen);
+								if(countdown != 10){
+									printf("The remaining retries nunber is %d.\n", countdown);
+								}
 								if (c >= 4) {
 									break;
 								}
 							}
 							if (!countdown) {
+								/*
+								char* err_word = "The requested filename is not exit.\n";
+								printf("%s", err_word);
+								int dlen = strlen(err_word);
+								memcpy(data, error_word, dlen);
+				    			tftp_send_error(s, 0, data, dlen, &client_sock, slen);
+								exit(1);
+								*/
 								printf("transfer timed out\n");
 								exit(1);
 							}
