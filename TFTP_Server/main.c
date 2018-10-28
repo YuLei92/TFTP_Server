@@ -23,7 +23,7 @@ char next_char = 0;
 };
 enum mode {
 	NETASCII = 1,
-	OCTET
+	OCTET = 2,
 };
 typedef union {
  	uint16_t opcode;
@@ -126,11 +126,15 @@ char *base_directory;
 				mode_s = strchr(filename, '\0') + 1;
 				opcode = ntohs(message.opcode);
 				fd = fopen(filename, opcode == RRQ ? "r" : "w");
+				if(fd == NULL){
+					printf("The requested file is not exit.\n");
+					exit(1);
+				}
 				mode = strcasecmp(mode_s, "netascii") ? NETASCII :strcasecmp(mode_s, "octet") ? OCTET :0;
 				printf("request received\n");
 				printf("The mode is %d\n", mode);
 
-				if (opcode == RRQ &&(mode == 1 || mode == -1)) {
+				if (opcode == RRQ &&(mode == 1 || mode == 2)) {
 					tftp_message m;
 					uint8_t data[512];
 					int dlen, c;
