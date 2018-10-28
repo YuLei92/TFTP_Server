@@ -12,6 +12,8 @@
 #define RECV_TIMEOUT 10
 #define RECV_RETRIES 10
 
+char next_char = 0;
+
  enum opcode {
 	RRQ = 1,
 	WRQ,
@@ -126,34 +128,81 @@ char *base_directory;
 				fd = fopen(filename, opcode == RRQ ? "r" : "w");
 				mode = strcasecmp(mode_s, "netascii") ? NETASCII :strcasecmp(mode_s, "octet") ? OCTET :0;
 				printf("request received\n");
+				printf("The mode is %d\n", mode);
 
-				if (opcode == RRQ) {
+				if (opcode == RRQ &&(mode == 1 || mode == -1)) {
 					tftp_message m;
 					uint8_t data[512];
 					int dlen, c;
 					uint16_t block_number = 0;
 					int countdown;
 					int to_close = 0;
-					while (!to_close) {
-						dlen = fread(data, 1, sizeof(data), fd);
-						block_number++;
-						if (dlen < 512) { 
-							to_close = 1;
-						}
-						for (countdown = RECV_RETRIES; countdown; countdown--) {
-							c = tftp_send_data(s, block_number, data, dlen, &client_sock, slen);
-							c = tftp_recv_message(s, &m, &client_sock, &slen);
-							if (c >= 4) {
-								break;
+					if(mode == 1){
+						while (!to_close) {
+							dlen = fread(data, 1, sizeof(data), fd);
+							block_number++;
+							if (dlen < 512) { 
+								to_close = 1;
+							}
+							for (countdown = RECV_RETRIES; countdown; countdown--) {
+								c = tftp_send_data(s, block_number, data, dlen, &client_sock, slen);
+								c = tftp_recv_message(s, &m, &client_sock, &slen);
+								if (c >= 4) {
+									break;
+								}
+							}
+							if (!countdown) {
+								printf("transfer timed out\n");
+								exit(1);
 							}
 						}
-						if (!countdown) {
-							printf("transfer timed out\n");
-							exit(1);
+					}else{
+						while(!to_close){
+							block_number++;
+							int count_r;
+							char* ptr;
+							char charc;
+							ptr = &(data[0]);
+							for(count_r = 0; count_r < 512; count_r++){
+								if(next_char >= 0){
+									*ptr++ = next_char;
+									next_char = -1;
+									continue;
+								}
+
+								charc = getc(fd);
+
+								if(charc == EOF){
+									if(ferror(fd)){
+									//	err_dump("read err from getc on local file");
+									}
+									to_close = 1;
+									break;
+								}else if(charc == '\n'){
+									charc = '\r';
+									next_char = '\n';
+								}else if(charc == '\r'){
+									next_char = '\0';
+								}else{
+									next_char = -1;
+								}
+								*ptr++ = charc;
+							}
+
+							for(countdown = RECV_RETRIES; countdown; countdown--){
+								c = tftp_send_data(s, block_number, data, count_r, &client_sock, slen);
+								c = tftp_recv_message(s, &m, &client_sock, &slen);
+								if (c >= 4) {
+									break;
+								}
+							}
+							if (!countdown) {
+								printf("transfer timed out\n");
+								exit(1);
+							}
 						}
 					}
-				}
-				else if (opcode == WRQ) {
+				} if (opcode == WRQ) {
 					tftp_message m;
 					ssize_t c;
 					uint16_t block_number = 0;
