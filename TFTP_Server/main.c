@@ -12,7 +12,7 @@
 #define RECV_TIMEOUT 10
 #define RECV_RETRIES 10
 
-char next_char = 0;
+char next_char = -1;
 
  enum opcode {
 	RRQ = 1,
