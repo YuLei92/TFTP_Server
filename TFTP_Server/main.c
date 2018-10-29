@@ -47,7 +47,6 @@ typedef union {
 	} error;
  } tftp_message;
 
-char *base_directory;
 
  ssize_t tftp_send_data(int s, uint16_t block_number, uint8_t *data,
 	ssize_t dlen, struct sockaddr_in *sock, socklen_t slen)
@@ -78,9 +77,11 @@ char *base_directory;
 			return 0;
 	}
 	*/
+	uint8_t data[512];
 	printf("%s\n", errormsg1);
 	dlen = strlen(errormsg1);
-	memcpy(m.error.error_string, errormsg1, dlen);
+	memcpy(data, errormsg1, dlen);
+	memcpy(m.error.error_string, data, 512);
 	c = sendto(s, &m, 4 + dlen, 0,	(struct sockaddr *) sock, slen);
  	return c;
 }
@@ -111,19 +112,20 @@ char *base_directory;
 	struct servent *ss;
 	struct sockaddr_in server_sock;
  	if (argc < 2) {
-		printf("usage: [base directory] [port]\n");
+		printf("usage: [ip address] [port]\n");
 		exit(1);
 	}
- 	base_directory = argv[1];
+ 	char* server_address = argv[1]; 
 	sscanf(argv[2], "%hu", &port);
 	port = htons(port);
 	ss = getservbyname("tftp", "udp");
 	pp = getprotobyname("udp");
 	s = socket(AF_INET, SOCK_DGRAM, pp->p_proto);
 	server_sock.sin_family = AF_INET;
-	server_sock.sin_addr.s_addr = htonl(INADDR_ANY);
+	server_sock.sin_addr.s_addr = inet_addr(server_address);
 	server_sock.sin_port = port ? port : ss->s_port;
- 	bind(s, (struct sockaddr *) &server_sock, sizeof(server_sock));
+ 	if(bind(s, (struct sockaddr *) &server_sock, sizeof(server_sock))<0)
+		perror("socket binding failed, please try with sudo\n");
  	printf("tftp server is listening\n");
  	while (1) {
 		struct sockaddr_in client_sock;
